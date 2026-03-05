@@ -1,0 +1,15 @@
+# Dependencies
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+openai
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+# Database
+aiosqlite
+chromadb

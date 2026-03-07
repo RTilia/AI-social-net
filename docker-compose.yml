@@ -9,6 +9,7 @@ services:
     volumes:
       - backend_data:/app/chroma_data
       - ./backend/app.db:/app/app.db
+      - ./backend/static:/app/static
     env_file:
       - ./backend/.env
     restart: always
@@ -18,8 +19,6 @@ services:
     container_name: ai-content-frontend
     ports:
       - "80:80"
-    environment:
-      - VITE_API_URL=http://localhost:8000
     depends_on:
       - backend
     restart: always

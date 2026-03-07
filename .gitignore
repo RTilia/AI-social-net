@@ -3,8 +3,12 @@ backend/venv/
 backend/__pycache__/
 backend/*.pyc
 backend/.env
-backend/app.db
+backend/*.db
 backend/chroma_data/
+backend/app.db
+backend/database.db
+backend/static/avatars/*
+!backend/static/avatars/.gitkeep
 
 # Node / Frontend
 frontend/node_modules/
@@ -12,6 +16,15 @@ frontend/dist/
 frontend/build/
 frontend/.env
 frontend/.env.local
+
+# Project level
+.venv/
+node_modules/
+dist/
+*.log
+tmp_*.txt
+*.seed
+*.pid
 
 # IDEs
 .vscode/
@@ -22,3 +35,4 @@ frontend/.env.local
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini

@@ -2,13 +2,69 @@ import React, { useState, useEffect } from 'react';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import { API_URL, getToken } from '../api';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, Zap, Brain, ShieldCheck, List, Timer, Target, BarChart3, ChevronRight } from 'lucide-react';
+import { useWebSocket } from '../hooks/useWebSocket';
 
-const API_URL = "http://localhost:8000";
+const cardBase = {
+    borderRadius: 20, padding: 24,
+    border: '1px solid rgba(255,255,255,0.06)',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+};
+
+function KpiCard({ label, value, target, good, icon: Icon, color, desc }) {
+    const [hovered, setHovered] = useState(false);
+    return (
+        <div
+            style={{
+                ...cardBase,
+                background: hovered ? 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)' : 'rgba(255,255,255,0.02)',
+                borderColor: hovered ? `${color}44` : 'rgba(255,255,255,0.06)',
+                boxShadow: hovered ? `0 20px 40px -20px ${color}22` : 'none',
+                transform: hovered ? 'translateY(-4px)' : 'none',
+            }}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ padding: 10, borderRadius: 12, background: `${color}15`, border: `1px solid ${color}25` }}>
+                    <Icon size={20} style={{ color }} />
+                </div>
+                <div style={{
+                    fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: 20,
+                    background: good ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                    color: good ? '#4ade80' : '#f87171',
+                    border: `1px solid ${good ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`
+                }}>
+                    Цель: {target}
+                </div>
+            </div>
+
+            <p style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'rgba(107,128,168,0.8)', marginBottom: 4 }}>{label}</p>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span style={{ fontSize: '2rem', fontWeight: 800, color: '#e8eeff', letterSpacing: '-0.02em' }}>{value}</span>
+                {good && <ShieldCheck size={16} style={{ color: '#4ade80' }} />}
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'rgba(107,128,168,0.6)', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Activity size={12} /> {desc}
+            </p>
+        </div>
+    );
+}
+
 
 function AdminDashboard() {
     const [metrics, setMetrics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    useWebSocket({
+        'METRICS_UPDATED': () => {
+            console.log('WS: Metrics updated, reloading...');
+            fetchMetrics();
+        }
+    });
 
     useEffect(() => {
         fetchMetrics();
@@ -17,7 +73,12 @@ function AdminDashboard() {
     const fetchMetrics = async () => {
         try {
             setLoading(true);
-            const res = await fetch(`${API_URL}/api/admin/metrics`);
+            const token = getToken();
+            const res = await fetch(`${API_URL}/api/admin/metrics`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
             setMetrics(data);
@@ -38,27 +99,30 @@ function AdminDashboard() {
     const kpiCards = [
         {
             label: "Ср. Время Генерации",
-            value: metrics?.avg_generation_time != null ? `${metrics.avg_generation_time} сек` : "—",
-            target: "< 30 сек",
+            value: metrics?.avg_generation_time != null ? `${metrics.avg_generation_time}с` : "—",
+            target: "< 30с",
             good: metrics?.avg_generation_time != null && metrics.avg_generation_time < 30,
-            icon: "⏱️",
-            desc: "Скорость ответа ИИ",
+            icon: Timer,
+            color: '#6366f1',
+            desc: "Скорость ответа ИИ пайплайна",
         },
         {
             label: "Ср. CLIP Score",
             value: metrics?.avg_clip_score != null ? `${metrics.avg_clip_score}` : "—",
             target: "> 75.0",
             good: metrics?.avg_clip_score != null && metrics.avg_clip_score > 75,
-            icon: "🎯",
-            desc: "Совпадение текста и картинки",
+            icon: Target,
+            color: '#10b981',
+            desc: "Консистентность текст-визуал",
         },
         {
             label: "Ср. Perplexity",
             value: metrics?.avg_perplexity != null ? `${metrics.avg_perplexity}` : "—",
             target: "< 25.0",
             good: metrics?.avg_perplexity != null && metrics.avg_perplexity < 25,
-            icon: "🧠",
-            desc: "Естественность текста",
+            icon: Brain,
+            color: '#f59e0b',
+            desc: "Естественность и читаемость",
         },
     ];
 
@@ -82,107 +146,170 @@ function AdminDashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-950 text-white p-8">
-            {/* Header */}
-            <div className="mb-10">
-                <div className="flex items-center gap-3 mb-1">
-                    <span className="text-3xl">🔒</span>
-                    <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
-                        Панель Администратора
-                    </h1>
-                </div>
-                <p className="text-gray-400 ml-11">Метрики качества генерации · Всего постов в БД: <span className="text-white font-bold">{metrics?.total_posts ?? 0}</span></p>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                {kpiCards.map(card => (
-                    <div key={card.label} className={`relative overflow-hidden rounded-2xl p-6 border ${card.good ? 'border-green-500/30 bg-green-500/10' : 'border-gray-700 bg-gray-900'}`}>
-                        <div className="absolute top-0 right-0 opacity-10 text-9xl leading-none rotate-12 pr-2">{card.icon}</div>
-                        <div className="relative">
-                            <span className="text-2xl mr-2">{card.icon}</span>
-                            <p className="text-gray-400 text-sm mt-1">{card.label}</p>
-                            <p className={`text-4xl font-black mt-1 ${card.good ? 'text-green-400' : 'text-white'}`}>
-                                {card.value}
-                            </p>
-                            <div className="flex items-center gap-2 mt-3">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${card.good ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
-                                    Цель: {card.target}
-                                </span>
-                                {card.good && <span className="text-green-400 text-xs font-bold">✓ ОК</span>}
+        <div style={{ minHeight: '100vh', background: '#060912', color: '#e8eeff' }}>
+            <AnimatePresence>
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ maxWidth: 1200, margin: '0 auto' }}
+                >
+                    {/* Header Section */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 20,
+                        marginBottom: 40,
+                        padding: '0 4px'
+                    }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                                <div style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', padding: 8, borderRadius: 12, display: 'flex' }}>
+                                    <ShieldCheck size={24} color="white" />
+                                </div>
+                                <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>
+                                    Панель <span style={{ color: '#8b5cf6' }}>Администратора</span>
+                                </h1>
                             </div>
-                            <p className="text-gray-500 text-xs mt-2">{card.desc}</p>
+                            <p style={{ fontSize: '0.875rem', color: 'rgba(107,128,168,0.7)', margin: 0, paddingLeft: 4 }}>
+                                Глобальный мониторинг качества и производительности системы
+                            </p>
+                        </div>
+
+                        <div style={{ textAlign: 'right', minWidth: 'fit-content' }}>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#e8eeff' }}>{metrics?.total_posts ?? 0}</div>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(107,128,168,0.5)' }}>Всего постов</div>
                         </div>
                     </div>
-                ))}
-            </div>
 
-            {/* Chart */}
-            <div className="bg-gray-900 rounded-2xl p-6 border border-gray-700">
-                <h2 className="text-lg font-bold mb-6 text-gray-200">📈 Тренды метрик (последние 20 генераций)</h2>
-                {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={350}>
-                        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                            <XAxis dataKey="name" stroke="#6b7280" tick={{ fontSize: 11 }} />
-                            <YAxis stroke="#6b7280" tick={{ fontSize: 11 }} />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#e5e7eb' }}
-                                labelStyle={{ color: '#9ca3af' }}
-                            />
-                            <Legend wrapperStyle={{ color: '#9ca3af', fontSize: '13px' }} />
-                            <Line
-                                type="monotone" dataKey="Время (сек)" stroke="#818cf8"
-                                strokeWidth={2} dot={{ r: 4, fill: '#818cf8' }} activeDot={{ r: 6 }}
-                            />
-                            <Line
-                                type="monotone" dataKey="CLIP Score" stroke="#34d399"
-                                strokeWidth={2} dot={{ r: 4, fill: '#34d399' }} activeDot={{ r: 6 }}
-                            />
-                            <Line
-                                type="monotone" dataKey="Perplexity" stroke="#f97316"
-                                strokeWidth={2} dot={{ r: 4, fill: '#f97316' }} activeDot={{ r: 6 }}
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-48 text-gray-500">
-                        <span className="text-4xl mb-3">📊</span>
-                        <p>Данных пока нет. Сгенерируйте несколько постов, чтобы графики появились.</p>
+                    {/* KPI Cards Grid */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+                        gap: 24,
+                        marginBottom: 40
+                    }}>
+                        {kpiCards.map(card => (
+                            <KpiCard key={card.label} {...card} />
+                        ))}
                     </div>
-                )}
-            </div>
 
-            {/* Table */}
-            {chartData.length > 0 && (
-                <div className="mt-8 bg-gray-900 rounded-2xl p-6 border border-gray-700">
-                    <h2 className="text-lg font-bold mb-4 text-gray-200">📋 Последние генерации</h2>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-left border-b border-gray-700">
-                                    <th className="pb-3 text-gray-400 font-semibold">Post ID</th>
-                                    <th className="pb-3 text-gray-400 font-semibold">Время (сек)</th>
-                                    <th className="pb-3 text-gray-400 font-semibold">CLIP Score</th>
-                                    <th className="pb-3 text-gray-400 font-semibold">Perplexity</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {[...chartData].reverse().map((row, i) => (
-                                    <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/50 transition">
-                                        <td className="py-3 text-indigo-400 font-mono">{row.name}</td>
-                                        <td className={`py-3 font-semibold ${row["Время (сек)"] < 30 ? 'text-green-400' : 'text-red-400'}`}>
-                                            {row["Время (сек)"]}
-                                        </td>
-                                        <td className="py-3 text-emerald-400">{row["CLIP Score"]}</td>
-                                        <td className="py-3 text-orange-400">{row["Perplexity"]}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    {/* Charts Section */}
+                    <div style={{ ...cardBase, background: 'rgba(13,16,32,0.6)', backdropFilter: 'blur(20px)', marginBottom: 40, overflowX: 'hidden' }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 16,
+                            marginBottom: 32
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <BarChart3 size={20} color="#818cf8" />
+                                <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0 }}>Тренды последних генераций</h2>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'rgba(107,128,168,0.6)', padding: '6px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
+                                Последние 20 прогонов
+                            </div>
+                        </div>
+
+                        {chartData.length > 0 ? (
+                            <div style={{ height: 350, width: '100%' }}>
+                                <ResponsiveContainer>
+                                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                        <XAxis
+                                            dataKey="name"
+                                            stroke="rgba(107,128,168,0.4)"
+                                            tick={{ fontSize: 10, fill: 'rgba(107,128,168,0.7)' }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                        />
+                                        <YAxis
+                                            stroke="rgba(107,128,168,0.4)"
+                                            tick={{ fontSize: 10, fill: 'rgba(107,128,168,0.7)' }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: '#0d1020',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                borderRadius: '14px',
+                                                boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                                                fontSize: '12px'
+                                            }}
+                                            itemStyle={{ padding: '2px 0' }}
+                                        />
+                                        <Legend iconType="circle" wrapperStyle={{ paddingTop: 20, fontSize: 12, color: 'rgba(107,128,168,0.8)' }} />
+                                        <Line
+                                            type="monotone" dataKey="Время (сек)" stroke="#6366f1"
+                                            strokeWidth={3} dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#0d1020' }}
+                                            activeDot={{ r: 6, strokeWidth: 0 }}
+                                        />
+                                        <Line
+                                            type="monotone" dataKey="CLIP Score" stroke="#10b981"
+                                            strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#0d1020' }}
+                                            activeDot={{ r: 6, strokeWidth: 0 }}
+                                        />
+                                        <Line
+                                            type="monotone" dataKey="Perplexity" stroke="#f59e0b"
+                                            strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#0d1020' }}
+                                            activeDot={{ r: 6, strokeWidth: 0 }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 250, border: '2px dashed rgba(255,255,255,0.03)', borderRadius: 20 }}>
+                                <BarChart3 size={40} style={{ color: 'rgba(107,128,168,0.2)', marginBottom: 16 }} />
+                                <p style={{ color: 'rgba(107,128,168,0.5)', fontSize: '0.875rem' }}>Недостаточно данных для построения графиков</p>
+                            </div>
+                        )}
                     </div>
-                </div>
-            )}
+
+                    {/* Detail Table */}
+                    {chartData.length > 0 && (
+                        <div style={{ ...cardBase, background: 'rgba(255,255,255,0.01)', marginBottom: 60, overflowX: 'auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                                <List size={20} color="#94a3b8" />
+                                <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0 }}>История генераций</h2>
+                            </div>
+
+                            <div style={{ minWidth: 600 }}> {/* Constrain min-width for table readability on móvil scroll */}
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                                            {['ID ПОСТА', 'ВРЕМЯ', 'CLIP SCORE', 'PERPLEXITY', ''].map(h => (
+                                                <th key={h} style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: 'rgba(107,128,168,0.5)', letterSpacing: '0.1em' }}>{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {[...chartData].reverse().map((row, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }}>
+                                                <td style={{ padding: '16px', fontSize: '0.875rem', fontWeight: 600, color: '#818cf8' }}>{row.name.replace('Post #', '#')}</td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: row["Время (сек)"] < 30 ? '#10b981' : '#f87171' }} />
+                                                        <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{row["Время (сек)"]}с</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px', fontSize: '0.875rem', color: '#34d399', fontWeight: 500 }}>{row["CLIP Score"]}</td>
+                                                <td style={{ padding: '16px', fontSize: '0.875rem', color: '#fbbf24', fontWeight: 500 }}>{row["Perplexity"]}</td>
+                                                <td style={{ padding: '16px', textAlign: 'right' }}>
+                                                    <ChevronRight size={16} color="rgba(107,128,168,0.3)" />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </motion.div>
+            </AnimatePresence>
         </div>
     );
 }

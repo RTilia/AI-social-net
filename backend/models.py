@@ -7,14 +7,31 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    
-    # Редактируемые метрики дашборда
+    name = Column(String, nullable=True)
+    avatar_url = Column(String, nullable=True)
+
+    # Метрики дашборда
     planned_posts = Column(Integer, default=0)
     active_brandbooks = Column(Integer, default=0)
     generated_texts = Column(Integer, default=0)
+
+    # Интеграции
+    yandex_disk_url = Column(String, nullable=True)
+    telegram_chat_id = Column(String, nullable=True)
+    telegram_auth_code = Column(String, nullable=True)
+    telegram_channel_id = Column(String, nullable=True)
+
     
     brandbooks = relationship("BrandBook", back_populates="owner")
     posts = relationship("Post", back_populates="owner")
+    cloud_integrations = relationship("CloudIntegration", back_populates="owner")
+
+class CloudIntegration(Base):
+    __tablename__ = "cloud_integrations"
+    id = Column(Integer, primary_key=True, index=True)
+    yandex_folder_url = Column(String)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="cloud_integrations")
 
 class BrandBook(Base):
     __tablename__ = "brandbooks"
@@ -34,11 +51,12 @@ class ContentPlan(Base):
 class Post(Base):
     __tablename__ = "posts"
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String)
-    content = Column(Text)
+    title = Column(String, nullable=True)
+    content = Column(Text, nullable=True)
     image_prompt = Column(Text, nullable=True)
     image_url = Column(String, nullable=True)
     status = Column(String, default="draft")
+    is_published = Column(Integer, default=0)  # 0 - нет, 1 - да (используем Integer для совместимости с SQLite)
     publish_date = Column(String, nullable=True)  # Формат: YYYY-MM-DD
     publish_time = Column(String, nullable=True)  # Формат: HH:MM
     generation_time_seconds = Column(Float, nullable=True)

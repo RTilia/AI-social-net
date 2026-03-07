@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_URL = import.meta.env.VITE_API_URL || "";
 
 let currentToken = localStorage.getItem('token') || null;
 
@@ -58,10 +58,12 @@ export const getMe = async () => {
     });
     if (!response.ok) {
         if (response.status === 401) setToken(null);
-        throw new Error("Необходима авторизация");
+        throw new Error("Не удалось получить данные пользователя");
     }
-    return await response.json();
+    return response.json();
 };
+
+
 
 export const updateMetrics = async (metrics) => {
     const response = await fetch(`${API_URL}/api/user/metrics`, {
@@ -71,6 +73,18 @@ export const updateMetrics = async (metrics) => {
     });
     if (!response.ok) throw new Error("Ошибка обновления метрик");
     return await response.json();
+};
+
+export const syncCloud = async () => {
+    const response = await fetch(`${API_URL}/api/cloud/sync`, {
+        method: 'POST',
+        headers: getHeaders(),
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || 'Ошибка синхронизации с облаком');
+    }
+    return response.json();
 };
 
 export const generatePost = async (theme, brandVoice, targetAudience, length = "Medium") => {
@@ -154,4 +168,65 @@ export const deletePost = async (postId) => {
     });
     if (!response.ok) throw new Error("Ошибка при удалении поста");
     return await response.json();
+};
+
+export const mergePosts = async (imagePostId, textPostId) => {
+    const response = await fetch(`${API_URL}/api/posts/merge`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ image_post_id: imagePostId, text_post_id: textPostId })
+    });
+    if (!response.ok) throw new Error("Ошибка при объединении постов");
+    return await response.json();
+};
+
+export const getTelegramConfig = async () => {
+    const response = await fetch(`${API_URL}/api/user/telegram`, {
+        method: "GET",
+        headers: getHeaders()
+    });
+    if (!response.ok) throw new Error("Ошибка при загрузке настроек Telegram");
+    return await response.json();
+};
+
+export const saveTelegramConfig = async (botToken, chatId) => {
+    const response = await fetch(`${API_URL}/api/user/telegram`, {
+        method: "PUT",
+        headers: getHeaders(),
+        body: JSON.stringify({ bot_token: botToken, chat_id: chatId })
+    });
+    if (!response.ok) throw new Error("Ошибка при сохранении настроек Telegram");
+    return await response.json();
+};
+
+// --- Agent Workflow ---
+export const runMultiAgent = async (draftId) => {
+    const response = await fetch(`${API_URL}/api/generate/multiagent/${draftId}`, {
+        method: 'POST',
+        headers: getHeaders(),
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Не удалось запустить мультиагента');
+    }
+    return response.json();
+};
+
+// --- Profile ---
+export const getProfile = async () => {
+    const response = await fetch(`${API_URL}/api/user/profile`, {
+        headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Ошибка загрузки профиля');
+    return response.json();
+};
+
+export const updateProfile = async (data) => {
+    const response = await fetch(`${API_URL}/api/user/profile`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Ошибка сохранения профиля');
+    return response.json();
 };

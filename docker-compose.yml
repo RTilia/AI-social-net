@@ -8,7 +8,8 @@ services:
       - "8000:8000"
     volumes:
       - backend_data:/app/chroma_data
-      - ./backend/data:/app/data
+      - sqlite_data:/app/data
+      - synced_images:/app/static/yandex_sync
       - ./backend/static:/app/static
     env_file:
       - ./backend/.env
@@ -25,3 +26,5 @@ services:
 
 volumes:
   backend_data:
+  sqlite_data:
+  synced_images:

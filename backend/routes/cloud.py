@@ -115,16 +115,33 @@ async def sync_yandex_disk(db: Session = Depends(get_db), current_user_id: int =
                         image_url = await get_public_download_url(client, public_key, item_path)
 
                     if image_url:
-                        new_post = models.Post(
-                            title=f"Черновик: {file_name}",
-                            content=None,
-                            image_url=image_url,
-                            status="draft",
-                            owner_id=current_user_id
-                        )
-                        db.add(new_post)
-                        synced_images += 1
-                        print(f"[cloud sync] Image '{file_name}' draft created")
+                        # Download image to local storage to avoid expired links/CORS
+                        import uuid
+                        ext = name_lower.rsplit('.', 1)[-1]
+                        local_filename = f"sync_{uuid.uuid4().hex[:12]}.{ext}"
+                        
+                        save_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'yandex_sync')
+                        os.makedirs(save_dir, exist_ok=True)
+                        save_path = os.path.join(save_dir, local_filename)
+                        
+                        img_resp = await client.get(image_url)
+                        if img_resp.status_code == 200:
+                            with open(save_path, 'wb') as f:
+                                f.write(img_resp.content)
+                            
+                            local_url = f"/static/yandex_sync/{local_filename}"
+                            new_post = models.Post(
+                                title=f"Черновик: {file_name}",
+                                content=None,
+                                image_url=local_url,
+                                status="draft",
+                                owner_id=current_user_id
+                            )
+                            db.add(new_post)
+                            synced_images += 1
+                            print(f"[cloud sync] Image '{file_name}' downloaded and saved as {local_url}")
+                        else:
+                            print(f"[cloud sync] Failed to download image '{file_name}': {img_resp.status_code}")
 
             # Save/update integration record
             integration = db.query(models.CloudIntegration).filter(

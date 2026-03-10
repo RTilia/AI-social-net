@@ -28,6 +28,9 @@ RUN echo "server { \
     location /api { \
     proxy_pass http://backend:8000; \
     } \
+    location /static { \
+    proxy_pass http://backend:8000; \
+    } \
     }" > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

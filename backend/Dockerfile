@@ -18,8 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Ensure static directories exist
-RUN mkdir -p static/avatars
+# Ensure static and data directories exist
+RUN mkdir -p static/avatars data
 
 EXPOSE 8000
 

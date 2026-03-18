@@ -10,6 +10,7 @@ load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "dummy_key")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -68,7 +69,7 @@ async def generate_image_hf(prompt: str) -> str | None:
     return None
 
 
-async def generate_post_content(brand_voice: str, theme: str, target_audience: str, length: str = "Medium") -> tuple[str, str]:
+async def generate_post_content(brand_voice: str, theme: str, target_audience: str, length: str = "Medium", ai_provider: str = "openrouter", ollama_model: str = "llama3") -> tuple[str, str]:
 
     length_instruction = {
         "Short": "Сделай текст очень коротким, максимум 1-2 абзаца.",
@@ -91,6 +92,25 @@ async def generate_post_content(brand_voice: str, theme: str, target_audience: s
     )
 
     async def get_text():
+        if ai_provider == "ollama":
+            try:
+                # Используем локальный Ollama API
+                async with httpx.AsyncClient(timeout=60.0) as http_client:
+                    response = await http_client.post(
+                        f"{OLLAMA_BASE_URL}/api/generate",
+                        json={
+                            "model": ollama_model,
+                            "prompt": f"System: {system_prompt_text}\nUser: Напиши пост.",
+                            "stream": False
+                        }
+                    )
+                    if response.status_code == 200:
+                        return response.json().get("response", "Ошибка: пустой ответ от Ollama")
+                    return f"Ошибка Ollama: {response.status_code} {response.text}"
+            except Exception as e:
+                return f"Ошибка генерации Ollama: {str(e)}"
+        
+        # Старая логика OpenRouter
         try:
             response = await client.chat.completions.create(
                 model="deepseek/deepseek-chat",
@@ -105,23 +125,41 @@ async def generate_post_content(brand_voice: str, theme: str, target_audience: s
 
     async def get_image_url():
         try:
-            # Шаг 1: получаем красивый промпт через DeepSeek
-            prompt_response = await client.chat.completions.create(
-                model="deepseek/deepseek-chat",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert prompt engineer for image generation AI. "
-                            "Create a short, vivid English image prompt (max 20 words) for a social media post about the given topic. "
-                            "Style: photorealistic, vibrant colors, professional photography. "
-                            "Reply ONLY with the prompt, no explanations."
+            # Шаг 1: получаем красивый промпт
+            if ai_provider == "ollama":
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as http_client:
+                        resp = await http_client.post(
+                            f"{OLLAMA_BASE_URL}/api/generate",
+                            json={
+                                "model": ollama_model,
+                                "prompt": (
+                                    f"System: You are an expert prompt engineer for image generation AI. Create a short, vivid English image prompt (max 20 words) for a social media post about the given topic. Style: photorealistic, vibrant colors, professional photography. Reply ONLY with the prompt, no explanations.\n"
+                                    f"User: {theme}"
+                                ),
+                                "stream": False
+                            }
                         )
-                    },
-                    {"role": "user", "content": theme}
-                ]
-            )
-            img_prompt = prompt_response.choices[0].message.content.strip()
+                        img_prompt = resp.json().get("response", theme).strip() if resp.status_code == 200 else theme
+                except:
+                    img_prompt = theme
+            else:
+                prompt_response = await client.chat.completions.create(
+                    model="deepseek/deepseek-chat",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are an expert prompt engineer for image generation AI. "
+                                "Create a short, vivid English image prompt (max 20 words) for a social media post about the given topic. "
+                                "Style: photorealistic, vibrant colors, professional photography. "
+                                "Reply ONLY with the prompt, no explanations."
+                            )
+                        },
+                        {"role": "user", "content": theme}
+                    ]
+                )
+                img_prompt = prompt_response.choices[0].message.content.strip()
             print(f"[Image] Prompt: {img_prompt}")
 
             # Шаг 2: пробуем HF

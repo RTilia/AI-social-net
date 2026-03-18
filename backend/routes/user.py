@@ -131,6 +131,8 @@ class ProfileResponse(BaseModel):
     telegram_auth_code: str | None
     telegram_chat_id: str | None
     telegram_channel_id: str | None
+    ai_provider: str | None = "openrouter"
+    ollama_model: str | None = "llama3"
     class Config:
         from_attributes = True
 
@@ -138,6 +140,8 @@ class ProfileUpdate(BaseModel):
     name: str | None = None
     yandex_disk_url: str | None = None
     telegram_channel_id: str | None = None
+    ai_provider: str | None = None
+    ollama_model: str | None = None
 
 @router.get("/profile", response_model=ProfileResponse)
 def get_profile(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
@@ -165,6 +169,10 @@ def update_profile(data: ProfileUpdate, user_id: int = Depends(get_current_user_
         user.yandex_disk_url = data.yandex_disk_url
     if data.telegram_channel_id is not None:
         user.telegram_channel_id = data.telegram_channel_id
+    if data.ai_provider is not None:
+        user.ai_provider = data.ai_provider
+    if data.ollama_model is not None:
+        user.ollama_model = data.ollama_model
     
     db.commit()
     db.refresh(user)

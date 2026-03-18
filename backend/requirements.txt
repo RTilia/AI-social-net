@@ -20,3 +20,4 @@ chromadb
 langgraph
 langchain
 langchain_openai
+ollama

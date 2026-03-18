@@ -52,7 +52,9 @@ export default function Profile() {
         avatar_url: '',
         yandex_disk_url: '',
         telegram_auth_code: '',
-        telegram_channel_id: ''
+        telegram_channel_id: '',
+        ai_provider: 'openrouter',
+        ollama_model: 'llama3'
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -68,7 +70,9 @@ export default function Profile() {
                 avatar_url: d.avatar_url || '',
                 yandex_disk_url: d.yandex_disk_url || '',
                 telegram_auth_code: d.telegram_auth_code || '',
-                telegram_channel_id: d.telegram_channel_id || ''
+                telegram_channel_id: d.telegram_channel_id || '',
+                ai_provider: d.ai_provider || 'openrouter',
+                ollama_model: d.ollama_model || 'llama3'
             }))
             .catch(() => showToast('Ошибка загрузки профиля', 'error'))
             .finally(() => setLoading(false));
@@ -94,7 +98,9 @@ export default function Profile() {
             await updateProfile({
                 name: form.name || null,
                 yandex_disk_url: form.yandex_disk_url || null,
-                telegram_channel_id: form.telegram_channel_id || null
+                telegram_channel_id: form.telegram_channel_id || null,
+                ai_provider: form.ai_provider,
+                ollama_model: form.ollama_model
             });
             showToast('Настройки сохранены');
         } catch (e) { showToast(e.message, 'error'); }
@@ -179,6 +185,43 @@ export default function Profile() {
                         placeholder="Заполнится ботом"
                     />
                 </div>
+            </SectionCard>
+
+            {/* AI Settings */}
+            <SectionCard color="#a78bfa">
+                <SectionLabel label="Настройки ИИ" color="#a78bfa" Icon={Bot} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 14 }}>
+                    <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(107,128,168,0.7)', marginBottom: 8 }}>
+                            <Bot size={12} style={{ color: '#a78bfa' }} /> AI Провайдер
+                        </label>
+                        <select 
+                            className="input" 
+                            value={form.ai_provider} 
+                            onChange={e => setForm(p => ({ ...p, ai_provider: e.target.value }))}
+                            style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', color: '#e8eeff' }}
+                        >
+                            <option value="openrouter" style={{ background: '#0e1222' }}>Облако (OpenRouter)</option>
+                            <option value="ollama" style={{ background: '#0e1222' }}>Локально (Ollama)</option>
+                        </select>
+                    </div>
+                    {form.ai_provider === 'ollama' && (
+                        <Field 
+                            label="Модель Ollama" 
+                            Icon={Bot} 
+                            color="#a78bfa" 
+                            type="text" 
+                            value={form.ollama_model} 
+                            onChange={e => setForm(p => ({ ...p, ollama_model: e.target.value }))} 
+                            placeholder="например: qwen2.5:7b" 
+                        />
+                    )}
+                </div>
+                {form.ai_provider === 'ollama' && (
+                    <p style={{ fontSize: '0.75rem', color: 'rgba(107,128,168,0.6)', marginTop: 12 }}>
+                        Убедитесь, что Ollama запущена локально на порту 11434.
+                    </p>
+                )}
             </SectionCard>
 
             <button onClick={handleSave} disabled={saving} className="btn-primary" style={{ justifyContent: 'center', padding: '13px 18px', width: '100%', fontSize: '0.9rem' }}>

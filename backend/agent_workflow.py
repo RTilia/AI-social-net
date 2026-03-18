@@ -8,6 +8,8 @@ import models
 from datetime import datetime, timedelta
 import time
 
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
 # Настройка LLM (используем OpenRouter)
 llm = ChatOpenAI(
     model="deepseek/deepseek-chat",
@@ -25,6 +27,7 @@ class AgentState(TypedDict):
     generated_text: Optional[str]
     suggested_date: Optional[str]
     start_time: Optional[float]
+    ai_settings: Optional[dict] # {provider: str, model: str}
 
 # --- Nodes ---
 
@@ -51,6 +54,11 @@ def monitor_node(state: AgentState):
                     "themes": brandbook.key_themes,
                     "audience": brandbook.target_audience
                 }
+            
+            state["ai_settings"] = {
+                "provider": user.ai_provider or "openrouter",
+                "model": user.ollama_model or "llama3"
+            }
         
         return state
     finally:
@@ -80,16 +88,40 @@ def copywriter_node(state: AgentState):
         "Твой текст:"
     )
     
-    chain = prompt | llm
+    ai_settings = state.get("ai_settings") or {"provider": "openrouter", "model": "deepseek/deepseek-chat"}
     
-    result = chain.invoke({
-        "context": context,
-        "tone": tone,
-        "themes": themes,
-        "target": target
-    })
+    if ai_settings["provider"] == "ollama":
+        import httpx
+        try:
+            print(f"[Copywriter] Использование Ollama ({ai_settings['model']})...")
+            # Рендерим промпт вручную
+            full_prompt = prompt.format(context=context, tone=tone, themes=themes, target=target)
+            with httpx.Client(timeout=60.0) as http_client:
+                resp = http_client.post(
+                    f"{OLLAMA_BASE_URL}/api/generate",
+                    json={
+                        "model": ai_settings["model"],
+                        "prompt": full_prompt,
+                        "stream": False
+                    }
+                )
+                if resp.status_code == 200:
+                    state["generated_text"] = resp.json().get("response", "Ошибка: пустой ответ от Ollama")
+                else:
+                    state["generated_text"] = f"Ошибка Ollama: {resp.status_code}"
+        except Exception as e:
+            state["generated_text"] = f"Ошибка генерации Ollama: {str(e)}"
+    else:
+        # OpenRouter (LangChain)
+        chain = prompt | llm
+        result = chain.invoke({
+            "context": context,
+            "tone": tone,
+            "themes": themes,
+            "target": target
+        })
+        state["generated_text"] = result.content
     
-    state["generated_text"] = result.content
     return state
 
 def scheduler_node(state: AgentState):
@@ -138,9 +170,29 @@ async def image_generator_node(state: AgentState):
         "Style: photorealistic, vibrant colors, premium quality. "
         "Reply ONLY with the prompt."
     )
-    chain = prompt_template | llm
-    result = await chain.ainvoke({"text": text_content[:500]})
-    img_prompt = result.content.strip()
+    ai_settings = state.get("ai_settings") or {"provider": "openrouter", "model": "deepseek/deepseek-chat"}
+    
+    if ai_settings["provider"] == "ollama":
+        import httpx
+        try:
+            print(f"[ImageGenerator] Использование Ollama для промпта ({ai_settings['model']})...")
+            full_prompt = prompt_template.format(text=text_content[:500])
+            with httpx.Client(timeout=30.0) as http_client:
+                resp = http_client.post(
+                    f"{OLLAMA_BASE_URL}/api/generate",
+                    json={
+                        "model": ai_settings["model"],
+                        "prompt": full_prompt,
+                        "stream": False
+                    }
+                )
+                img_prompt = resp.json().get("response", text_content[:50]).strip() if resp.status_code == 200 else text_content[:50]
+        except:
+            img_prompt = text_content[:50]
+    else:
+        chain = prompt_template | llm
+        result = await chain.ainvoke({"text": text_content[:500]})
+        img_prompt = result.content.strip()
     print(f"[ImageGenerator] Prompt: {img_prompt}")
     
     # 2. Обращаемся к HF API

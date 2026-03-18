@@ -20,6 +20,10 @@ class User(Base):
     telegram_chat_id = Column(String, nullable=True)
     telegram_auth_code = Column(String, nullable=True)
     telegram_channel_id = Column(String, nullable=True)
+    
+    # Настройки ИИ
+    ai_provider = Column(String, default="openrouter")
+    ollama_model = Column(String, default="llama3")
 
     
     brandbooks = relationship("BrandBook", back_populates="owner")

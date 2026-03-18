@@ -217,7 +217,7 @@ function AdminDashboard() {
                         {chartData.length > 0 ? (
                             <div style={{ height: 350, width: '100%' }}>
                                 <ResponsiveContainer>
-                                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                                    <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                         <XAxis
                                             dataKey="name"
@@ -244,19 +244,34 @@ function AdminDashboard() {
                                         />
                                         <Legend iconType="circle" wrapperStyle={{ paddingTop: 20, fontSize: 12, color: 'rgba(107,128,168,0.8)' }} />
                                         <Line
-                                            type="monotone" dataKey="Время (сек)" stroke="#6366f1"
-                                            strokeWidth={3} dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#0d1020' }}
-                                            activeDot={{ r: 6, strokeWidth: 0 }}
+                                            type="monotone" 
+                                            dataKey="Время (сек)" 
+                                            stroke="#6366f1"
+                                            strokeWidth={3} 
+                                            dot={{ r: 4, fill: '#6366f1' }}
+                                            activeDot={{ r: 6 }}
+                                            connectNulls
+                                            isAnimationActive={false}
                                         />
                                         <Line
-                                            type="monotone" dataKey="CLIP Score" stroke="#10b981"
-                                            strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#0d1020' }}
-                                            activeDot={{ r: 6, strokeWidth: 0 }}
+                                            type="monotone" 
+                                            dataKey="CLIP Score" 
+                                            stroke="#10b981"
+                                            strokeWidth={3} 
+                                            dot={{ r: 4, fill: '#10b981' }}
+                                            activeDot={{ r: 6 }}
+                                            connectNulls
+                                            isAnimationActive={false}
                                         />
                                         <Line
-                                            type="monotone" dataKey="Perplexity" stroke="#f59e0b"
-                                            strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#0d1020' }}
-                                            activeDot={{ r: 6, strokeWidth: 0 }}
+                                            type="monotone" 
+                                            dataKey="Perplexity" 
+                                            stroke="#f59e0b"
+                                            strokeWidth={3} 
+                                            dot={{ r: 4, fill: '#f59e0b' }}
+                                            activeDot={{ r: 6 }}
+                                            connectNulls
+                                            isAnimationActive={false}
                                         />
                                     </LineChart>
                                 </ResponsiveContainer>

@@ -335,6 +335,17 @@ function ContentCalendar({ onLoad }) {
     const handleSaveSchedule = async (postId, date, time) => {
         const orig = [...posts];
         setPosts(posts.map(p => p.id === postId ? { ...p, publish_date: date, publish_time: time } : p));
+        
+        // Auto-jump calendar view to the scheduled week
+        if (date && date.includes('-')) {
+            const [y, m, d] = date.split('-');
+            const scheduledDate = new Date(y, parseInt(m) - 1, d, 12, 0, 0);
+            if (!isNaN(scheduledDate.getTime())) {
+                const newWeekStart = startOfWeek(scheduledDate, { weekStartsOn: 1 });
+                setCurrentWeekStart(newWeekStart);
+            }
+        }
+        
         try {
             await updatePostDate(postId, date, time);
             if (onLoad) onLoad();

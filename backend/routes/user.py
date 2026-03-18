@@ -4,7 +4,6 @@ from pydantic import BaseModel
 import models
 from database import SessionLocal
 from auth_utils import get_current_user_id
-from services.vector_db import upsert_user_vector
 import os, shutil, uuid
 import random
 
@@ -60,16 +59,6 @@ def update_metrics(metrics: MetricsUpdate, user_id: int = Depends(get_current_us
     
     db.commit()
     db.refresh(user)
-    
-    # Сохраняем информацию о пользователе в векторную базу данных
-    info_text = f"Пользователь {user.username}. Метрики: {user.planned_posts} запланированных постов, {user.active_brandbooks} активных брендбуков, {user.generated_texts} сгенерированных текстов."
-    metadata = {
-        "username": user.username,
-        "planned_posts": user.planned_posts,
-        "active_brandbooks": user.active_brandbooks,
-        "generated_texts": user.generated_texts
-    }
-    upsert_user_vector(user.id, info_text, metadata)
     
     return user
 

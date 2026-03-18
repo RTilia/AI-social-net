@@ -5,7 +5,7 @@ import httpx
 import os
 from database import SessionLocal
 import models
-from services.vector_db import upsert_user_vector
+from services.vector_db import add_post_to_vector_db
 from auth_utils import get_current_user_id
 
 router = APIRouter(prefix="/api/cloud", tags=["cloud"])
@@ -90,12 +90,6 @@ async def sync_yandex_disk(db: Session = Depends(get_db), current_user_id: int =
                         if text_resp.status_code == 200:
                             content = text_resp.text.strip()
                             if content:
-                                # Save to ChromaDB for AI context
-                                upsert_user_vector(
-                                    user_id=current_user_id,
-                                    info_text=content,
-                                    metadata={"source": "yandex_disk", "filename": file_name}
-                                )
                                 # Also create a Post record so text is visible/draggable in UI
                                 new_text_post = models.Post(
                                     title=f"Текст: {file_name}",
@@ -105,6 +99,9 @@ async def sync_yandex_disk(db: Session = Depends(get_db), current_user_id: int =
                                     owner_id=current_user_id
                                 )
                                 db.add(new_text_post)
+                                db.flush()
+                                # Save to ChromaDB for AI context
+                                add_post_to_vector_db(post_id=new_text_post.id, user_id=current_user_id, content=content, topic=file_name)
                                 synced_texts += 1
                                 print(f"[cloud sync] TXT '{file_name}' saved to ChromaDB + Post record created")
 

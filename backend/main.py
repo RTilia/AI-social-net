@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import models
 from database import engine, SessionLocal
@@ -71,27 +72,31 @@ def get_db():
 async def check_and_publish_posts():
     db = SessionLocal()
     try:
-        # Get current time for comparison
-        now = datetime.now()
-        current_date_str = now.strftime("%Y-%m-%d")
-        current_time_str = now.strftime("%H:%M")
+        # Use LOCAL time (not UTC) so it matches what the user entered in the UI
+        import time as _time
+        now_local = datetime.fromtimestamp(_time.time())
+        current_date_str = now_local.strftime("%Y-%m-%d")
+        current_time_str = now_local.strftime("%H:%M")
         
         # Find posts that are scheduled, haven't been published, and belong to a user with Telegram channel
         pending_posts = db.query(models.Post).join(models.User).filter(
             models.Post.publish_date != None,
-            models.Post.publish_time != None,
             models.Post.is_published == 0,
             models.User.telegram_channel_id != None
         ).all()
         
         for post in pending_posts:
             # Check if it's time to publish
-            # We publish if the date is in the past, or if it's today and the time is <= current time
             should_publish = False
             if post.publish_date < current_date_str:
+                # Past date — always publish
                 should_publish = True
-            elif post.publish_date == current_date_str and post.publish_time <= current_time_str:
-                should_publish = True
+            elif post.publish_date == current_date_str:
+                if not post.publish_time:
+                    # No specific time set — publish any time today
+                    should_publish = True
+                elif post.publish_time <= current_time_str:
+                    should_publish = True
                 
             if should_publish:
                 print(f"[Scheduler] Publishing post ID {post.id} to Telegram Channel...")
@@ -137,6 +142,18 @@ async def shutdown_event():
     await stop_telegram_bot()
     print("Telegram Bot stopped.")
 
-@app.get("/")
-def read_root():
-    return {"message": "AI Platform API is running"}
+frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+assets_dir = os.path.join(frontend_dir, "assets")
+
+if os.path.exists(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    if full_path.startswith("api/") or full_path.startswith("static/") or full_path.startswith("ws"):
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    index_path = os.path.join(frontend_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "Frontend not built yet. Run 'npm run build' in the frontend directory."}

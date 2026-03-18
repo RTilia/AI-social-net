@@ -46,14 +46,16 @@ def monitor_node(state: AgentState):
         
         user = post.owner
         if user:
-            # Получаем первый активный брендбук пользователя (упрощенно)
             brandbook = db.query(models.BrandBook).filter(models.BrandBook.owner_id == user.id).first()
-            if brandbook:
-                state["brand_voice"] = {
-                    "tone": brandbook.tone_of_voice,
-                    "themes": brandbook.key_themes,
-                    "audience": brandbook.target_audience
-                }
+            bv = {
+                "tone": brandbook.tone_of_voice if brandbook else "Professional",
+                "themes": brandbook.key_themes if brandbook else "Общие темы",
+                "audience": brandbook.target_audience if brandbook else "Широкая аудитория",
+                "examples": []
+            }
+            from services.vector_db import get_similar_posts
+            bv["examples"] = get_similar_posts(user.id, state["context_text"])
+            state["brand_voice"] = bv
             
             state["ai_settings"] = {
                 "provider": user.ai_provider or "openrouter",
@@ -64,7 +66,7 @@ def monitor_node(state: AgentState):
     finally:
         db.close()
 
-def copywriter_node(state: AgentState):
+async def copywriter_node(state: AgentState):
     """Генерирует текст с учетом brand voice."""
     print("[Copywriter] Написание текста поста...")
     
@@ -72,6 +74,13 @@ def copywriter_node(state: AgentState):
     tone = brand_voice.get("tone", "Professional")
     themes = brand_voice.get("themes", "Общие темы")
     target = brand_voice.get("audience", "Широкая аудитория")
+    examples = brand_voice.get("examples", [])
+    
+    examples_text = ""
+    if examples:
+        examples_text = "\n\nПРИМЕРЫ УСПЕШНЫХ ПРОШЛЫХ ПОСТОВ (используй их стиль и подачу):\n"
+        for i, text in enumerate(examples, 1):
+            examples_text += f"-- Пример {i} --\n{text}\n\n"
     
     context = state.get("context_text", "")
     
@@ -80,13 +89,14 @@ def copywriter_node(state: AgentState):
         "Контекст или черновик: {context}\n"
         "Стиль общения (Tone of Voice): {tone}\n"
         "Ключевые темы: {themes}\n"
-        "Целевая аудитория: {target}\n\n"
+        "Целевая аудитория: {target}\n"
+        "{examples_text}"
         "Ограничения:\n"
         "- Запрещено использовать маркдаун (никаких **, *, #)\n"
         "- Используй абзацы\n"
         "- Добавь пару эмодзи, но не переборщи\n\n"
         "Твой текст:"
-    )
+    ).partial(examples_text=examples_text)
     
     ai_settings = state.get("ai_settings") or {"provider": "openrouter", "model": "deepseek/deepseek-chat"}
     
@@ -96,8 +106,8 @@ def copywriter_node(state: AgentState):
             print(f"[Copywriter] Использование Ollama ({ai_settings['model']})...")
             # Рендерим промпт вручную
             full_prompt = prompt.format(context=context, tone=tone, themes=themes, target=target)
-            with httpx.Client(timeout=60.0) as http_client:
-                resp = http_client.post(
+            async with httpx.AsyncClient(timeout=60.0) as http_client:
+                resp = await http_client.post(
                     f"{OLLAMA_BASE_URL}/api/generate",
                     json={
                         "model": ai_settings["model"],
@@ -114,7 +124,7 @@ def copywriter_node(state: AgentState):
     else:
         # OpenRouter (LangChain)
         chain = prompt | llm
-        result = chain.invoke({
+        result = await chain.ainvoke({
             "context": context,
             "tone": tone,
             "themes": themes,

@@ -1,33 +1,36 @@
-version: '3.8'
 
 services:
-  backend:
-    build: ./backend
-    container_name: ai-content-backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - backend_data:/app/chroma_data
-      - sqlite_data:/app/data
-      - synced_images:/app/static/yandex_sync
-      - ./backend/static:/app/static
-    env_file:
-      - ./backend/.env
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-    depends_on:
-      - ollama
-    restart: always
-
+  # ─── Local AI Model (Ollama) ───────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
     container_name: ai-ollama
     ports:
       - "11434:11434"
     volumes:
-      - ollama_data:/root/.ollama
+      # Reuse models already downloaded on the Mac — no re-download needed!
+      - ~/.ollama:/root/.ollama
     restart: always
 
+  # ─── FastAPI Backend ───────────────────────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: ai-content-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_chroma:/app/chroma_data
+      - backend_db:/app/data
+      - backend_static:/app/static
+    env_file:
+      - ./backend/.env
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DATABASE_URL=sqlite:////app/data/app.db
+    depends_on:
+      - ollama
+    restart: always
+
+  # ─── React Frontend (built → served by Nginx) ─────────────────────────────
   frontend:
     build: ./frontend
     container_name: ai-content-frontend
@@ -38,7 +41,6 @@ services:
     restart: always
 
 volumes:
-  backend_data:
-  sqlite_data:
-  synced_images:
-  ollama_data:
+  backend_chroma:
+  backend_db:
+  backend_static:

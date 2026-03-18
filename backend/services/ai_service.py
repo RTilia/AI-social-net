@@ -69,7 +69,7 @@ async def generate_image_hf(prompt: str) -> str | None:
     return None
 
 
-async def generate_post_content(brand_voice: str, theme: str, target_audience: str, length: str = "Medium", ai_provider: str = "openrouter", ollama_model: str = "llama3") -> tuple[str, str]:
+async def generate_post_content(brand_voice: str, theme: str, target_audience: str, length: str = "Medium", ai_provider: str = "openrouter", ollama_model: str = "llama3", user_id: int = None) -> tuple[str, str]:
 
     length_instruction = {
         "Short": "Сделай текст очень коротким, максимум 1-2 абзаца.",
@@ -77,11 +77,21 @@ async def generate_post_content(brand_voice: str, theme: str, target_audience: s
         "Long": "Напиши подробный лонгрид, разделенный на смысловые блоки."
     }.get(length, "Сделай текст среднего размера.")
 
+    from services.vector_db import get_similar_posts
+    examples_text = ""
+    if user_id:
+        similar_posts = get_similar_posts(user_id, theme)
+        if similar_posts:
+            examples_text = "\n\nПРИМЕРЫ УСПЕШНЫХ ПРОШЛЫХ ПОСТОВ (используй их стиль и подачу):\n"
+            for i, text in enumerate(similar_posts, 1):
+                examples_text += f"-- Пример {i} --\n{text}\n\n"
+
     system_prompt_text = (
         f"Ты креативный SMM-специалист и копирайтер. Напиши яркий и вовлекающий пост для соцсетей на тему '{theme}'.\n"
         f"Целевая аудитория: {target_audience}.\n"
         f"Уникальный стиль твоего бренда (Tone of Voice): {brand_voice}.\n\n"
         f"{length_instruction}\n\n"
+        f"{examples_text}"
         "ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:\n"
         "1. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ использовать markdown: никаких звездочек (**), решеток (#) для заголовков, подчеркиваний (_) или жирного шрифта.\n"
         "2. Текст должен выглядеть эстетично и читаемо.\n"
@@ -94,8 +104,8 @@ async def generate_post_content(brand_voice: str, theme: str, target_audience: s
     async def get_text():
         if ai_provider == "ollama":
             try:
-                # Используем локальный Ollama API
-                async with httpx.AsyncClient(timeout=60.0) as http_client:
+                # CPU inference in Docker can take 2-3 minutes — use long timeout
+                async with httpx.AsyncClient(timeout=300.0) as http_client:
                     response = await http_client.post(
                         f"{OLLAMA_BASE_URL}/api/generate",
                         json={
@@ -128,7 +138,7 @@ async def generate_post_content(brand_voice: str, theme: str, target_audience: s
             # Шаг 1: получаем красивый промпт
             if ai_provider == "ollama":
                 try:
-                    async with httpx.AsyncClient(timeout=30.0) as http_client:
+                    async with httpx.AsyncClient(timeout=120.0) as http_client:
                         resp = await http_client.post(
                             f"{OLLAMA_BASE_URL}/api/generate",
                             json={
@@ -177,5 +187,10 @@ async def generate_post_content(brand_voice: str, theme: str, target_audience: s
             print(f"[Image] Error: {e}")
             return f"https://loremflickr.com/1024/1024/business"
 
-    text, img_url = await asyncio.gather(get_text(), get_image_url())
+    # For Ollama (CPU), run sequentially to avoid resource contention
+    if ai_provider == "ollama":
+        text = await get_text()
+        img_url = await get_image_url()
+    else:
+        text, img_url = await asyncio.gather(get_text(), get_image_url())
     return text, img_url

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from database import SessionLocal
 import models
 from auth_utils import get_current_user_id
+from services.vector_db import add_post_to_vector_db
 
 router = APIRouter(
     prefix="/api/posts",
@@ -60,6 +61,10 @@ def create_post(post: PostCreate, db: Session = Depends(get_db), current_user_id
     db.add(db_post)
     db.commit()
     db.refresh(db_post)
+    
+    if db_post.content:
+        add_post_to_vector_db(db_post.id, current_user_id, db_post.content, db_post.title or "Сгенерированный пост")
+        
     return db_post
 
 @router.get("/", response_model=List[PostResponse])
@@ -121,4 +126,8 @@ def merge_posts(req: MergeRequest, db: Session = Depends(get_db), current_user_i
     db.delete(txt_post)
     db.commit()
     db.refresh(merged)
+    
+    if merged.content:
+        add_post_to_vector_db(merged.id, current_user_id, merged.content, merged.title or "Собранный пост")
+        
     return merged

@@ -6,7 +6,6 @@ import models
 from database import SessionLocal
 from auth_utils import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta
-from services.vector_db import upsert_user_vector
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -36,16 +35,6 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    
-    # Сохраняем начальные данные в векторную БД
-    info_text = f"Пользователь {new_user.username}. Начальный профиль."
-    metadata = {
-        "username": new_user.username,
-        "planned_posts": 0,
-        "active_brandbooks": 0,
-        "generated_texts": 0
-    }
-    upsert_user_vector(new_user.id, info_text, metadata)
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(

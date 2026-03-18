@@ -34,6 +34,16 @@ async def send_telegram_post(bot_token: str, chat_id: str, text: str, image_url:
                     image_bytes = base64.b64decode(encoded)
                     files = {"photo": ("image.jpg", image_bytes, "image/jpeg")}
                     response = await client.post(url, data=data, files=files)
+                elif image_url.startswith("/static/"):
+                    import os
+                    filepath = "." + image_url
+                    if os.path.exists(filepath):
+                        with open(filepath, "rb") as f:
+                            files = {"photo": ("image.jpg", f.read(), "image/jpeg")}
+                        response = await client.post(url, data=data, files=files)
+                    else:
+                        logger.error(f"Local image not found: {filepath}")
+                        return False
                 else:
                     data["photo"] = image_url
                     response = await client.post(url, data=data)

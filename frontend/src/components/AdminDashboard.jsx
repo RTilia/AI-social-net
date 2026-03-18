@@ -251,7 +251,6 @@ function AdminDashboard() {
                                             dot={{ r: 4, fill: '#6366f1' }}
                                             activeDot={{ r: 6 }}
                                             connectNulls
-                                            isAnimationActive={false}
                                         />
                                         <Line
                                             type="monotone" 
@@ -261,7 +260,6 @@ function AdminDashboard() {
                                             dot={{ r: 4, fill: '#10b981' }}
                                             activeDot={{ r: 6 }}
                                             connectNulls
-                                            isAnimationActive={false}
                                         />
                                         <Line
                                             type="monotone" 
@@ -271,7 +269,6 @@ function AdminDashboard() {
                                             dot={{ r: 4, fill: '#f59e0b' }}
                                             activeDot={{ r: 6 }}
                                             connectNulls
-                                            isAnimationActive={false}
                                         />
                                     </LineChart>
                                 </ResponsiveContainer>

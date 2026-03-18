@@ -43,7 +43,8 @@ async def generate_post(req: GenerateRequest, user_id: int = Depends(get_current
         req.target_audience, 
         req.length,
         ai_provider=provider,
-        ollama_model=model
+        ollama_model=model,
+        user_id=user_id
     )
     gen_time = round(time.time() - start, 2)
     clip = round(random.uniform(75.0, 95.0), 2)
